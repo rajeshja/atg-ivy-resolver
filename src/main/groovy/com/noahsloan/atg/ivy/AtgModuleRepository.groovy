@@ -120,7 +120,7 @@ class AtgModuleRepository extends AbstractRepository {
 			def file = new File(filePath)
 			if (file.exists()) {
 				r = new BuiltFileResource(file.absoluteFile)
-				logDebug("file was found: ${r}")
+				log.debug("file was found: ${r}")
 			}
 		}
 
