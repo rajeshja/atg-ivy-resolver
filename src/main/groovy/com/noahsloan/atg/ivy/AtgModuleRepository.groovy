@@ -50,10 +50,10 @@ class AtgModuleRepository extends AbstractRepository {
 	
 	protected File createDefaultJar() {
 		Jar task = new Jar()
-		def defaultManifest = File.createTempFile("atg-default",".mf")
+		def defaultManifest = File.createTempFile("atg-default", ".mf")
 		Manifest.defaultManifest.print(defaultManifest.newPrintWriter())
 		task.manifest = defaultManifest
-		def defaultJar = File.createTempFile("atg-default",".jar")
+		def defaultJar = File.createTempFile("atg-default", ".jar")
 		task.destFile = defaultJar
 		task.execute()
 
@@ -69,7 +69,7 @@ class AtgModuleRepository extends AbstractRepository {
 			root = new File(root).parentFile
 		}  else {
 			root = new File(".").absoluteFile
-			while(root && !new File(root,"home/bin/checkDynamo").exists()) {
+			while(root && !new File(root, "home/bin/checkDynamo").exists()) {
 				root = root.parentFile
 			}
 		}
@@ -107,11 +107,20 @@ class AtgModuleRepository extends AbstractRepository {
 	
 	@Override
 	public void get(String src, File dest) throws IOException {
-		def r 
+		def r
+		log.debug("looking up for file: ${src}")
 		if (src.startsWith("file:/")) {
-			def file = new File(src[6..-1])
+			def filePath
+			if (System.properties['os.name'].toLowerCase().contains('windows')) {
+				filePath = src[6..-1]
+			} else {
+				filePath = src[5..-1]
+			}
+			log.debug("file path on FS: ${filePath}")
+			def file = new File(filePath)
 			if (file.exists()) {
 				r = new BuiltFileResource(file.absoluteFile)
+				logDebug("file was found: ${r}")
 			}
 		}
 
@@ -119,6 +128,7 @@ class AtgModuleRepository extends AbstractRepository {
 		if (!r) {
 			def match = src =~ /atg-(.+?)-TMP-.*-ivy\.xml/
 			if(match) {
+				log.debug("ivy descriptor located: ${match[0][1]}")
 				r = getResource(match[0][1])
 			} else {
 				match = src =~ /([^\/]+)\/lib\/classes\.jar$/
@@ -148,30 +158,30 @@ class AtgModuleRepository extends AbstractRepository {
 		if(src == 'default-jar') {
 			return new BuiltFileResource(defaultJar)
 		}
-		def (org,module,ver,type,resName,resExt) = (src.split(/:/) as List)
-		def modulePath = (module==null)?'tmp':module.replaceAll('\\.','/')
+		def (org, module, ver, type, resName, resExt) = (src.split(/:/) as List)
+		def modulePath = (module==null) ? 'tmp' : module.replaceAll('\\.','/')
 		if(org != ORG) {
-			return new BasicResource(org + ' not found',false,0,0,false)
+			return new BasicResource(org + ' not found', false, 0, 0, false)
 		}
 		File file = getVersionedFile(ver, modulePath, "META-INF/MANIFEST.MF")
 
 		if (!file.exists()) {
 			throw new Exception("Couldn't find module ${module}. Is CUSTOM_ROOT set properly?")
 		} else if (type == "ivy") { 
-			File tmp = File.createTempFile("atg-${module}-TMP-","-ivy.xml")
+			File tmp = File.createTempFile("atg-${module}-TMP-", "-ivy.xml")
 			tmp.withWriter {
 				def build = new groovy.xml.MarkupBuilder(it)
 				build.doubleQuotes = true
 				build.'ivy-module'(version:'2.0') {
 					info(
-							organisation: org,
-							module: module,
-							revision: ver,
-							status: 'release',
-							'default': 'true',
+							organisation : org,
+							module : module,
+							revision : ver,
+							status : 'release',
+							'default' : 'true',
 							)
 					build.configurations() {
-						conf(name:"default",visibility:"public")
+						conf(name : "default", visibility : "public")
 					}
 
 					file.withReader {
@@ -193,10 +203,10 @@ class AtgModuleRepository extends AbstractRepository {
 							def reqIfPresent = m.getMainSection().getAttributeValue("ATG-Required-If-Present")
 							def reqToCompile = m.getMainSection().getAttributeValue("ATG-Required-To-Compile")
 
-							req = (reqIfPresent==null) ? req : (req + ' ' + reqIfPresent)
-							req = (reqToCompile==null) ? req : (req + ' ' + reqToCompile)
+							req = (reqIfPresent == null) ? req : (req + ' ' + reqIfPresent)
+							req = (reqToCompile == null) ? req : (req + ' ' + reqToCompile)
 							req?.split(/\s+/)?.findAll {it}?.each {
-								build.dependency(org:ORG,name:it,rev:ver)
+								build.dependency(org:ORG, name:it, rev:ver)
 							}
 						}
 					}
@@ -240,15 +250,15 @@ class AtgModuleRepository extends AbstractRepository {
 	}
 
 	private File getVersionedFile(String ver, String modulePath, String filePath) {
-		File file = new File(getAtgVersionedRoot(ver),"${modulePath}/${filePath}")
-		def int i=0
+		File file = new File(getAtgVersionedRoot(ver), "${modulePath}/${filePath}")
+		def int i = 0
 		while (!file.exists() && i<ATG_OTHER_PRODUCTS.size()) {
-			file = new File(getAtgVersionedRoot(ver),"${ATG_OTHER_PRODUCTS[i]}${ver}/${modulePath}/${filePath}")
+			file = new File(getAtgVersionedRoot(ver), "${ATG_OTHER_PRODUCTS[i]}${ver}/${modulePath}/${filePath}")
 			i++
 		}
 
 		if(!file.exists()) {
-			file = new File(customRoot,"${modulePath}/${filePath}")
+			file = new File(customRoot, "${modulePath}/${filePath}")
 		}
 
 		file
